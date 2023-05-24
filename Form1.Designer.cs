@@ -28,18 +28,21 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.SuspendLayout();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
+            SuspendLayout();
             // 
             // Form1
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackgroundImage = global::adachi_reaction_bot.Properties.Resources.b12_2_0;
-            this.ClientSize = new System.Drawing.Size(470, 441);
-            this.Name = "Form1";
-            this.Text = "Adachi bot";
-            this.ResumeLayout(false);
-
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackgroundImage = (Image)resources.GetObject("$this.BackgroundImage");
+            BackgroundImageLayout = ImageLayout.Stretch;
+            ClientSize = new Size(353, 331);
+            DoubleBuffered = true;
+            Margin = new Padding(3, 2, 3, 2);
+            Name = "Form1";
+            Text = "Adachi bot";
+            ResumeLayout(false);
         }
 
         #endregion

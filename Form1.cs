@@ -1,16 +1,12 @@
-using System;
-using System.Drawing;
-using System.Threading;
-using System.Timers;
-using Tweetinvi;
-using Tweetinvi.Parameters;
-//using static System.Net.Mime.MediaTypeNames;
+using Microsoft.Playwright;
+using Newtonsoft.Json;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+
 
 namespace adachi_reaction_bot
 {
     public partial class Form1 : Form
     {
-        TwitterClient client;
 
         string[] words;
 
@@ -19,14 +15,9 @@ namespace adachi_reaction_bot
             //ui stuff
             InitializeComponent();
 
-            //reads the file with all the words in it
-            var read = File.OpenText(Directory.GetCurrentDirectory() + "/words.txt");
 
             //puts each word into an arrays
-            words = read.ReadToEnd().Split("\n");
-
-            //signs you in to twitter
-            client = new TwitterClient("consumer key", "consumer secret", "access token", "access secret");
+            words = File.OpenText(Directory.GetCurrentDirectory() + "/words.txt").ReadToEnd().Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries).Select(wr => wr.Trim()).ToArray();
 
             //executed to include the async
             WaitABit();
@@ -45,6 +36,11 @@ namespace adachi_reaction_bot
 
             //hides it so it becomes a background proccess
             Hide();
+
+            //makes it collapsable to hide
+            #region login
+            await Login("username", "password");
+            #endregion
 
             //runs the bot part os the program once
             Run();
@@ -144,14 +140,8 @@ namespace adachi_reaction_bot
                     bg.Save(Path.Combine(Directory.GetCurrentDirectory(), "output.png"));
                 }
 
-                //adds the image or something
-                var tweetinviLogoBinary = File.ReadAllBytes($"{Directory.GetCurrentDirectory()}/output.png");
-
-                //uploads the image methinks
-                var uploadedImage = await client.Upload.UploadTweetImageAsync(tweetinviLogoBinary);
-
-                //tweets the tweeet
-                var tweetWithImage = await client.Tweets.PublishTweetAsync(new PublishTweetParameters(word) { Medias = { uploadedImage } });
+                //tweets out the finished image
+                Tweet(word, $"{Directory.GetCurrentDirectory()}/output.png");
             }
             //fail-safe
             catch (Exception ex)
@@ -159,6 +149,131 @@ namespace adachi_reaction_bot
                 //writes to the console you'll never see
                 Console.WriteLine(ex.Message);
             }
+        }
+
+        //a method to send a tweet using playwright
+        async void Tweet(string text, string filePath)
+        {
+            IBrowser browser;
+            IBrowserType chrome;
+            IPage page;
+            IPlaywright playwright;
+
+            //makes a playwright instance ig
+            playwright = await Playwright.CreateAsync();
+
+            //makes the browser use chrome
+            chrome = playwright.Chromium;
+
+            //launches the browser
+            browser = await chrome.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+
+            //makes a new page
+            page = await browser.NewPageAsync();
+
+            //reads the cookie file
+            var json = File.ReadAllText("cookies.json");
+
+            //turs the cookie file into uhh a cookie array
+            var cookies = JsonConvert.DeserializeObject<Cookie[]>(json);
+
+            //adds cookies to page
+            await page.Context.AddCookiesAsync(cookies);
+
+            //goes to twitter
+            await page.GotoAsync("https://twitter.com/compose/tweet", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
+
+            //waits until the page is loaded
+            await Task.Delay(7000);
+
+            //types the tweet
+            await page.Keyboard.TypeAsync(text);
+
+            //waits for the file explorer to open
+            var fileChooser = await page.RunAndWaitForFileChooserAsync(async () =>
+            {
+                //presses the image button
+                await page.GetByRole(AriaRole.Button, new() { Name = "Add photos or video" }).ClickAsync();
+            });
+            //sets the file explorer file to the 
+            await fileChooser.SetFilesAsync(filePath);
+
+            //presses the tweet button
+            await page.GetByTestId("tweetButton").ClickAsync();
+
+            //waits for it to send
+            await Task.Delay(3000);
+
+            //closes everything
+            await page.CloseAsync();
+            await browser.CloseAsync();
+            playwright.Dispose();
+        }
+
+        //logs you in
+        async Task Login(string username, string password)
+        {
+            //checks if there is already a cookies file
+            if (File.Exists($"{Directory.GetCurrentDirectory()}/cookies.json"))
+                return;
+
+            IBrowser browser;
+            IBrowserType chrome;
+            IPage page;
+            IPlaywright playwright;
+
+            //makes a playwright instance ig
+            playwright = await Playwright.CreateAsync();
+
+            //makes the browser use chrome
+            chrome = playwright.Chromium;
+
+            //launches the browser
+            browser = await chrome.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+
+            //makes a new page
+            page = await browser.NewPageAsync();
+
+            //navigates to the main twitter page
+            await page.GotoAsync("https://twitter.com/", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
+
+            //clicks the login buttton
+            await page.GetByTestId("login").ClickAsync();
+
+            //waits until the page loads i think i actually dont know if this is even necessary but if it works it works
+            await page.WaitForURLAsync("https://twitter.com/i/flow/login");
+
+            //types in the username
+            await page.GetByLabel("Phone, email, or username").TypeAsync(username);
+
+            //clicks the next button so the password field shows
+            await page.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
+
+            //waits for it to load
+            await Task.Delay(100);
+
+            //typs in the password
+            await page.GetByLabel("Password", new() { Exact = true }).TypeAsync(password);
+
+            //clicks the login button to log in
+            await page.GetByTestId("LoginForm_Login_Button").ClickAsync();
+
+            //waits until everything is fully loaded and finalized
+            await Task.Delay(5000);
+
+            //grabs the page's cookies
+            var cookies = await page.Context.CookiesAsync();
+
+            //turns the cookies into a json
+            var json = JsonConvert.SerializeObject(cookies);
+
+            //saves the cookies to the computer
+            File.WriteAllText("cookies.json", json);
+
+            //closes everything
+            await page.CloseAsync();
+            await browser.CloseAsync();
+            playwright.Dispose();
         }
     }
 }

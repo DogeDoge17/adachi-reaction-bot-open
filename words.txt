@@ -16751,7 +16751,8 @@ padded
 paddle-wheel
 paederastic
 paediatric
-paedophilia
+pædophilia
+pædophilic
 pagan
 paginal
 pagurian
