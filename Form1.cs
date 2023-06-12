@@ -1,7 +1,5 @@
 using Microsoft.Playwright;
 using Newtonsoft.Json;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
-
 
 namespace adachi_reaction_bot
 {
