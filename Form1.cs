@@ -1,5 +1,7 @@
 using Microsoft.Playwright;
 using Newtonsoft.Json;
+using System.Globalization;
+using System.Net;
 
 namespace adachi_reaction_bot
 {
@@ -152,6 +154,9 @@ namespace adachi_reaction_bot
         //a method to send a tweet using playwright
         async void Tweet(string text, string filePath)
         {
+            if (!InternetCheck())
+                return;
+
             IBrowser browser;
             IBrowserType chrome;
             IPage page;
@@ -173,7 +178,7 @@ namespace adachi_reaction_bot
             var json = File.ReadAllText("cookies.json");
 
             //turs the cookie file into uhh a cookie array
-            var cookies = JsonConvert.DeserializeObject<Cookie[]>(json);
+            var cookies = JsonConvert.DeserializeObject<Microsoft.Playwright.Cookie[]>(json);
 
             //adds cookies to page
             await page.Context.AddCookiesAsync(cookies);
@@ -214,6 +219,9 @@ namespace adachi_reaction_bot
             //checks if there is already a cookies file
             if (File.Exists($"{Directory.GetCurrentDirectory()}/cookies.json"))
                 return;
+
+            if (!InternetCheck())
+                throw new Exception("Failed to login. Please make sure you have a working internet connection.");    
 
             IBrowser browser;
             IBrowserType chrome;
@@ -272,6 +280,35 @@ namespace adachi_reaction_bot
             await page.CloseAsync();
             await browser.CloseAsync();
             playwright.Dispose();
+        }
+
+        public bool InternetCheck()
+        {
+            try
+            {
+                int timeoutMs = 10000; string url = null;
+
+                url ??= CultureInfo.InstalledUICulture switch
+                {
+                    { Name: var n } when n.StartsWith("fa") => //iran check
+                        "http://www.aparat.com",
+                    { Name: var n } when n.StartsWith("zh") => //china check
+                        "http://www.baidu.com",
+                    _ =>
+                        "http://www.gstatic.com/generate_204",
+                };
+               
+                var request = (HttpWebRequest)WebRequest.Create(url);
+                request.KeepAlive = false;
+                request.Timeout = timeoutMs;
+                using (var response = (HttpWebResponse)request.GetResponse())
+                    return true;
+            }
+            catch
+            {
+                return false;
+            }
+
         }
     }
 }
