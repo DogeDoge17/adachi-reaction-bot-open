@@ -154,6 +154,7 @@ namespace adachi_reaction_bot
         //a method to send a tweet using playwright
         async void Tweet(string text, string filePath)
         {
+            //checks for internet
             if (!InternetCheck())
                 return;
 
@@ -220,6 +221,7 @@ namespace adachi_reaction_bot
             if (File.Exists($"{Directory.GetCurrentDirectory()}/cookies.json"))
                 return;
 
+            //checks for internet so the website can load properly 
             if (!InternetCheck())
                 throw new Exception("Failed to login. Please make sure you have a working internet connection.");    
 
@@ -283,11 +285,12 @@ namespace adachi_reaction_bot
         }
 
         public bool InternetCheck()
-        {
+        {            
             try
             {
                 int timeoutMs = 10000; string url = null;
 
+                //checks to see where you are to get past country made restrictions
                 url ??= CultureInfo.InstalledUICulture switch
                 {
                     { Name: var n } when n.StartsWith("fa") => //iran check
@@ -298,6 +301,7 @@ namespace adachi_reaction_bot
                         "http://www.gstatic.com/generate_204",
                 };
                
+                //connects to the website
                 var request = (HttpWebRequest)WebRequest.Create(url);
                 request.KeepAlive = false;
                 request.Timeout = timeoutMs;
@@ -306,6 +310,7 @@ namespace adachi_reaction_bot
             }
             catch
             {
+                //if it fails there is no internet
                 return false;
             }
 
