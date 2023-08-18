@@ -5,7 +5,7 @@ the source code for https://twitter.com/adachireaction with comments
 
 it uses playwright
 
-when builing with playwright for the first time, you will have to install its browsers.
+when building with playwright for the first time, you will have to install its browsers.
 
 1. build the program
 2. get the error saying the playwright browsers aren't installed
