@@ -202,6 +202,9 @@ namespace adachi_reaction_bot
             //sets the file explorer file to the 
             await fileChooser.SetFilesAsync(filePath);
 
+            //Waits for the image to load (2/9/2024 incident)
+            await Task.Delay(4000);
+
             //presses the tweet button
             await page.GetByTestId("tweetButton").ClickAsync();
 
