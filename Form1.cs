@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using Newtonsoft.Json;
 using System.Globalization;
 using System.Net;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 namespace adachi_reaction_bot
 {
@@ -10,6 +11,10 @@ namespace adachi_reaction_bot
 
         string[] words;
 
+        #region login
+        string password = "";
+        string username = "";
+        #endregion
         public Form1()
         {
             //ui stuff
@@ -37,10 +42,8 @@ namespace adachi_reaction_bot
             //hides it so it becomes a background proccess
             Hide();
 
-            //makes it collapsable to hide
-            #region login
-            await Login("username", "password");
-            #endregion
+
+            await Login(username, password);
 
             //runs the bot part os the program once
             Run();
@@ -175,20 +178,32 @@ namespace adachi_reaction_bot
             //makes a new page
             page = await browser.NewPageAsync();
 
-            //reads the cookie file
-            var json = File.ReadAllText("cookies.json");
+            //something something loading cookies + failsafe (6/28/2024 incident)
+            while (true)
+            {
+                var json = "";
+                if (!File.Exists("cookies.json"))
+                    await Login(username, password);
+                json = File.ReadAllText("cookies.json");
+                var cookies = JsonConvert.DeserializeObject<Microsoft.Playwright.Cookie[]>(json);
 
-            //turs the cookie file into uhh a cookie array
-            var cookies = JsonConvert.DeserializeObject<Microsoft.Playwright.Cookie[]>(json);
+                // Add cookies to page
+                await page.Context.AddCookiesAsync(cookies);
 
-            //adds cookies to page
-            await page.Context.AddCookiesAsync(cookies);
+                await page.GotoAsync("https://twitter.com/compose/tweet", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
+                await page.ReloadAsync();
+                if (page.Url.Contains("https://x.com/i/flow/login"))
+                {
+                    if (File.Exists("cookies.json"))
+                        File.Delete("cookies.json");
+                    await Login(username, password);
+                    continue;
+                }
 
-            //goes to twitter
-            await page.GotoAsync("https://twitter.com/compose/tweet", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
-
-            //waits until the page is loaded
-            await Task.Delay(7000);
+                await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+                await Task.Delay(7000);
+                break;
+            }
 
             //types the tweet
             await page.Keyboard.TypeAsync(text);
@@ -246,13 +261,13 @@ namespace adachi_reaction_bot
             page = await browser.NewPageAsync();
 
             //navigates to the main twitter page
-            await page.GotoAsync("https://twitter.com/", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await page.GotoAsync("https://x.com/", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
 
             //clicks the login buttton
-            await page.GetByTestId("login").ClickAsync();
+            await page.GetByTestId("loginButton").ClickAsync();
 
             //waits until the page loads i think i actually dont know if this is even necessary but if it works it works
-            await page.WaitForURLAsync("https://twitter.com/i/flow/login");
+            await page.WaitForURLAsync("https://x.com/i/flow/login");
 
             //types in the username
             await page.GetByLabel("Phone, email, or username").TypeAsync(username);
