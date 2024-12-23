@@ -1,7 +1,9 @@
 using Microsoft.Playwright;
 using Newtonsoft.Json;
+using System;
 using System.Globalization;
 using System.Net;
+using System.Timers;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 namespace adachi_reaction_bot
@@ -9,176 +11,199 @@ namespace adachi_reaction_bot
     public partial class Form1 : Form
     {
 
-        string[] words;
+        Language[] langs;
 
-        #region login
-        string password = "";
-        string username = "";
-        #endregion
+        string? username;
+        string? password;
+
         public Form1()
         {
-            //ui stuff
             InitializeComponent();
 
+            langs = new Language[]
+            {
+                new(Directory.GetCurrentDirectory() + "/lang/es.txt", "es", 5.0),
+                new(Directory.GetCurrentDirectory() + "/lang/en.txt", "en", 100.0),
+            };
 
-            //puts each word into an arrays
-            words = File.OpenText(Directory.GetCurrentDirectory() + "/words.txt").ReadToEnd().Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries).Select(wr => wr.Trim()).ToArray();
 
-            //executed to include the async
             WaitABit();
         }
 
+
         async void WaitABit()
         {
-            //waits for the program to finalize
             await Task.Delay(500);
 
-            //sets up a timer
-            var timer = new PeriodicTimer(TimeSpan.FromMinutes(15));
+            //aTimer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
+            ///aTimer.Start();
+            ///
 
-            //makes sure the program isn't on top
+            //  aTimer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
+            //aTimer.Start();
+
+            var timer = new PeriodicTimer(TimeSpan.FromMinutes(30));
+
+            //this.Icon = Properties.Resources.icon;
             TopLevel = false;
-
-            //hides it so it becomes a background proccess
             Hide();
+            if (!File.Exists("login.txt"))
+            {
+                File.Create("login.txt");
+                MessageBox.Show("Created a login file. Please fill it out");
+                Application.Exit();
+            }
 
+            using (StreamReader reader = new StreamReader("login.txt"))
+            {
+                username = reader.ReadLine();
+                password = reader.ReadLine();
+            }
 
             await Login(username, password);
 
-            //runs the bot part os the program once
+
             Run();
 
-            //constantly will check to see if the timer is up  
             while (await timer.WaitForNextTickAsync())
             {
-                //runs the bot part that tweets
                 Run();
             }
         }
 
-        float GetFontSize(string input, Graphics g)
+        private void OnTimedEvent(object source, ElapsedEventArgs e)
         {
-            //set the starting font size
+            Run();
+        }
+
+        float GetFontSize(string input, Graphics g, Language lang)
+        {
             float fontSize = 34;
 
-            //create a new font object with the starting size
+            foreach (char c in input)
+                if (char.ConvertToUtf32(input, input.IndexOf(c)) > 127)
+                {
+                    fontSize = 21; //make max size smaller if accent
+                    break;
+                }
+
+            // Create a new font object with the starting size
             Font font = new Font("Comic Sans MS", fontSize);
 
-            //set the text string
+            // Set the text string
             string text = input;
 
-            //set the maximum width of the text in pixels
+            // Set the maximum width of the text in pixels
             float maxWidth = 700 - 10;
 
-            //measure the width of the text in pixels
+            // Measure the width of the text in pixels
             SizeF textSize = g.MeasureString(text, font);
 
-            //adjust the font size until the text fits within the maximum width
+            // Adjust the font size until the text fits within the maximum width
             while (textSize.Width > maxWidth)
             {
-                //makes the font smaller
                 fontSize--;
-
-                //makes a new font with the new size
                 font = new Font("Comic Sans MS", fontSize);
-
-                //measures again
                 textSize = g.MeasureString(text, font);
             }
 
-            //returns the value
+            // Draw the text on the image
+            //    g.DrawString(text, font, Brushes.Black, new PointF(5, 5));
+
             return fontSize;
         }
 
-        //the part that generates the image and tweets
+        /// <summary>
+        /// The method the bot runs every 30 minutes. Generates a tweet then calls a method to tweet it.
+        /// </summary>
         async void Run()
         {
             try
             {
-                //gets all the adachi pictures
-                var files = Directory.GetFiles($"{Directory.GetCurrentDirectory()}/adachi", "*.png", SearchOption.AllDirectories);
+                Language lang = Language.RollChances(langs);
 
-                //comment chooses a random word
-                var word = words[Random.Shared.Next(0, words.Length)].ToUpper() + "!";
+                ///--------               
+                /// Handles the variables the bot uses to put onto the image               
+                
+                var word = lang.GetWord();
+                //var word = DrawingHelper.CustomWord($"Custom Word Here");
 
-                //var word = "CUSTOM WORD HERE!";//comment chooses a random word               
+                Image image = DrawingHelper.GetRandomImage();
+                //Image image = DrawingHelper.CustomImage(AdachiExpressions.BlushHappy);
 
-                //chooses a random adachi portrait
-                Image image = Image.FromFile(files[Random.Shared.Next(0, files.Length)]);
+                Color randomColor = DrawingHelper.RandomColour(151);
+                //Color randomColor = Color.HotPink;
+                //Color randomColor = DrawingHelper.CustomColour(255,255,255);
 
-                //Image image = Image.FromFile($"{Directory.GetCurrentDirectory()}/adachi/b12_2_0.png");
+                ///--------
 
-                //grabs the background
-                Image bg = Image.FromFile($"{Directory.GetCurrentDirectory()}/bg.png");
-
-                //chooses a random colour
-                Color randomColor = Color.FromArgb(Random.Shared.Next(151), Random.Shared.Next(151), Random.Shared.Next(151));
-
-                //makes the uh brush
                 SolidBrush drawBrush = new SolidBrush(randomColor);
+                PointF drawPoint = new PointF(0, 570);
 
+                Image bg = Image.FromFile($"{Directory.GetCurrentDirectory()}/bg.png");
                 using (Graphics g = Graphics.FromImage(bg))
                 {
-                    //grabs the max font size relative to the word
-                    float fontSize = GetFontSize(word, g);
+                    float fontSize = GetFontSize(word.formatted, g, lang);
 
-                    //makes the font 
                     Font drawFont = new Font("Comic Sans MS", fontSize);
 
-                    //places adachi onto the background and then stretches him to fit properly
                     g.DrawImage(image, new Rectangle(0, 0, 700, 555), new Rectangle(107, 65, 285, 270), GraphicsUnit.Pixel);
 
-                    //makes the text centred
                     StringFormat stringFormat = new StringFormat();
                     stringFormat.Alignment = StringAlignment.Center;
                     stringFormat.LineAlignment = StringAlignment.Center;
 
-                    //smooths out the text with anti aliasing
                     g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                    g.DrawString(word.formatted, drawFont, drawBrush, new RectangleF(0, 570, 700, 130), stringFormat);
 
-                    //draws the text to the image
-                    g.DrawString(word, drawFont, drawBrush, new RectangleF(0, 570, 700, 130), stringFormat);
-
-                    //saves the image
                     bg.Save(Path.Combine(Directory.GetCurrentDirectory(), "output.png"));
                 }
-
-                //tweets out the finished image
-                Tweet(word, $"{Directory.GetCurrentDirectory()}/output.png");
+               
+                Tweet(word.raw, $"{Directory.GetCurrentDirectory()}/output.png");
             }
-            //fail-safe
             catch (Exception ex)
             {
-                //writes to the console you'll never see
                 Console.WriteLine(ex.Message);
             }
         }
 
-        //a method to send a tweet using playwright
         async void Tweet(string text, string filePath)
         {
-            //checks for internet
-            if (!InternetCheck())
+            try
+            {
+                int timeoutMs = 10000; string url = null;
+
+                url ??= CultureInfo.InstalledUICulture switch
+                {
+                    { Name: var n } when n.StartsWith("fa") => //iran check
+                        "http://www.aparat.com",
+                    { Name: var n } when n.StartsWith("zh") => //china check
+                        "http://www.baidu.com",
+                    _ =>
+                        "http://www.gstatic.com/generate_204",
+                };
+
+                var request = (HttpWebRequest)WebRequest.Create(url);
+                request.KeepAlive = false;
+                request.Timeout = timeoutMs;
+            }
+            catch
+            {
                 return;
+            }
+
 
             IBrowser browser;
             IBrowserType chrome;
             IPage page;
+
             IPlaywright playwright;
 
-            //makes a playwright instance ig
             playwright = await Playwright.CreateAsync();
-
-            //makes the browser use chrome
             chrome = playwright.Chromium;
-
-            //launches the browser
             browser = await chrome.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-
-            //makes a new page
             page = await browser.NewPageAsync();
 
-            //something something loading cookies + failsafe (6/28/2024 incident)
             while (true)
             {
                 var json = "";
@@ -205,34 +230,24 @@ namespace adachi_reaction_bot
                 break;
             }
 
-            //types the tweet
-            await page.Keyboard.TypeAsync(text);
-
-            //waits for the file explorer to open
             var fileChooser = await page.RunAndWaitForFileChooserAsync(async () =>
             {
-                //presses the image button
                 await page.GetByRole(AriaRole.Button, new() { Name = "Add photos or video" }).ClickAsync();
             });
-            //sets the file explorer file to the 
             await fileChooser.SetFilesAsync(filePath);
 
-            //Waits for the image to load (2/9/2024 incident)
+            await page.GetByRole(AriaRole.Textbox, new() { Name = "Post text" }).TypeAsync(text);
+
             await Task.Delay(4000);
 
-            //presses the tweet button
             await page.GetByTestId("tweetButton").ClickAsync();
 
-            //waits for it to send
             await Task.Delay(3000);
-
-            //closes everything
             await page.CloseAsync();
             await browser.CloseAsync();
             playwright.Dispose();
         }
 
-        //logs you in
         async Task Login(string username, string password)
         {
             //checks if there is already a cookies file
@@ -240,98 +255,42 @@ namespace adachi_reaction_bot
                 return;
 
             //checks for internet so the website can load properly 
-            if (!InternetCheck())
-                throw new Exception("Failed to login. Please make sure you have a working internet connection.");    
+            //  if (!InternetCheck())
+            //    throw new Exception("Failed to login. Please make sure you have a working internet connection.");
 
             IBrowser browser;
             IBrowserType chrome;
             IPage page;
             IPlaywright playwright;
 
-            //makes a playwright instance ig
             playwright = await Playwright.CreateAsync();
-
-            //makes the browser use chrome
             chrome = playwright.Chromium;
-
-            //launches the browser
             browser = await chrome.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-
-            //makes a new page
             page = await browser.NewPageAsync();
 
-            //navigates to the main twitter page
             await page.GotoAsync("https://x.com/", new() { WaitUntil = WaitUntilState.DOMContentLoaded });
 
-            //clicks the login buttton
-            await page.GetByTestId("loginButton").ClickAsync();
 
-            //waits until the page loads i think i actually dont know if this is even necessary but if it works it works
+            await page.GetByTestId("loginButton").ClickAsync();
             await page.WaitForURLAsync("https://x.com/i/flow/login");
 
-            //types in the username
             await page.GetByLabel("Phone, email, or username").TypeAsync(username);
-
-            //clicks the next button so the password field shows
             await page.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
-
-            //waits for it to load
             await Task.Delay(100);
 
-            //typs in the password
             await page.GetByLabel("Password", new() { Exact = true }).TypeAsync(password);
 
-            //clicks the login button to log in
             await page.GetByTestId("LoginForm_Login_Button").ClickAsync();
-
-            //waits until everything is fully loaded and finalized
             await Task.Delay(5000);
 
-            //grabs the page's cookies
             var cookies = await page.Context.CookiesAsync();
 
-            //turns the cookies into a json
             var json = JsonConvert.SerializeObject(cookies);
-
-            //saves the cookies to the computer
             File.WriteAllText("cookies.json", json);
 
-            //closes everything
             await page.CloseAsync();
             await browser.CloseAsync();
             playwright.Dispose();
-        }
-
-        public bool InternetCheck()
-        {            
-            try
-            {
-                int timeoutMs = 10000; string url = null;
-
-                //checks to see where you are to get past country made restrictions
-                url ??= CultureInfo.InstalledUICulture switch
-                {
-                    { Name: var n } when n.StartsWith("fa") => //iran check
-                        "http://www.aparat.com",
-                    { Name: var n } when n.StartsWith("zh") => //china check
-                        "http://www.baidu.com",
-                    _ =>
-                        "http://www.gstatic.com/generate_204",
-                };
-               
-                //connects to the website
-                var request = (HttpWebRequest)WebRequest.Create(url);
-                request.KeepAlive = false;
-                request.Timeout = timeoutMs;
-                using (var response = (HttpWebResponse)request.GetResponse())
-                    return true;
-            }
-            catch
-            {
-                //if it fails there is no internet
-                return false;
-            }
-
         }
     }
 }
