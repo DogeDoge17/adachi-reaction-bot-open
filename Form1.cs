@@ -114,6 +114,12 @@ namespace adachi_reaction_bot
         }
 
         /// <summary>
+        /// prevents duplicates to be made in a row (if you have a custom word and forgot to close the instance of that bot)
+        /// </summary>
+        private Word lastWord;
+
+
+        /// <summary>
         /// The method the bot runs every 30 minutes. Generates a tweet then calls a method to tweet it.
         /// </summary>
         async void Run()
@@ -126,7 +132,7 @@ namespace adachi_reaction_bot
                 /// Handles the variables the bot uses to put onto the image               
                 
                 var word = lang.GetWord();
-                //var word = DrawingHelper.CustomWord($"Custom Word Here");
+                //var word = DrawingHelper.CustomWord($"Custom Word Here");                
 
                 Image image = DrawingHelper.GetRandomImage();
                 //Image image = DrawingHelper.CustomImage(AdachiExpressions.BlushHappy);
@@ -136,6 +142,11 @@ namespace adachi_reaction_bot
                 //Color randomColor = DrawingHelper.CustomColour(255,255,255);
 
                 ///--------
+
+                if (lastWord.Equals(word))
+                    return;
+
+                lastWord = word;
 
                 SolidBrush drawBrush = new SolidBrush(randomColor);
                 PointF drawPoint = new PointF(0, 570);
